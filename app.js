@@ -57,3 +57,5 @@ app.post("/stream/:id", async (req, res) => {
 app.listen(process.env.PORT || port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+export default app;
