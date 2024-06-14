@@ -75,7 +75,7 @@ app.post("/watch", async (req, res) => {
             clientVersion: "1.9",
             androidSdkVersion: 30,
             hl: "en",
-            gl: "US",
+            gl: "ID",
             utcOffsetMinutes: 0,
           },
         },
