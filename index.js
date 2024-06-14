@@ -4,23 +4,47 @@ import { Innertube } from "youtubei.js";
 
 const app = express();
 const port = 5000;
+
+app.use(express.json());
+
 app.use(cors());
 
-// main entry
-app.get("/", (res) => {
-  res.json({ message: "Finally you here!" });
+app.get("/", (req, res) => {
+  res.send("Finally you here!");
 });
 
-// get stream data by id parameter
 app.post("/stream", async (req, res) => {
-  const videoId = req.query.videoId;
+  try {
+    const videoId = req.query.videoId;
 
-  console.log(videoId);
-  const yt = await Innertube.create();
-  const info = await yt.getBasicInfo(videoId);
-  const format = info.chooseFormat({ type: "audio", quality: "best" });
-  const url = format?.decipher(yt.session.player);
-  res.send(url);
+    if (!videoId) {
+      return res
+        .status(400)
+        .json({ error: "videoId query parameter is required" });
+    }
+
+    const yt = await Innertube.create();
+    const info = await yt.getBasicInfo(videoId);
+
+    if (!info) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    const format = info.chooseFormat({ type: "audio", quality: "best" });
+
+    if (!format) {
+      return res.status(404).json({ error: "Suitable format not found" });
+    }
+
+    const url = format.decipher(yt.session.player);
+
+    if (!url) {
+      return res.status(500).json({ error: "Failed to retrieve stream URL" });
+    }
+    res.send(url);
+  } catch (error) {
+    res.status(500).json({ error: "internal setver error" });
+  }
 });
 
 app.listen(port, () => {
