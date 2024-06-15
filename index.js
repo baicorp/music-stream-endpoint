@@ -77,6 +77,7 @@ app.post("/watch", async (req, res) => {
             hl: "en",
             gl: "ID",
             utcOffsetMinutes: 0,
+            params: "8AEB",
           },
         },
       }),
