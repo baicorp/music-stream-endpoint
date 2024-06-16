@@ -1,3 +1,5 @@
+import axios from "axios";
+
 function getStringBetweenStrings(data, start_string, end_string) {
   const regex = new RegExp(
     `${escapeStringRegexp(start_string)}(.*?)${escapeStringRegexp(end_string)}`,
@@ -86,4 +88,85 @@ export async function player() {
     nsig_sc,
     player_id,
   };
+}
+
+const baseURL = "https://music.youtube.com";
+const apiKey = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+const axiosInstance = axios.create({
+  baseURL: baseURL,
+  headers: {
+    "Content-Type": "application/json",
+    "X-Goog-Api-Key": apiKey,
+  },
+  params: {
+    prettyPrint: "false",
+  },
+});
+
+const endpoints = {
+  player: "/youtubei/v1/player",
+};
+
+export async function fetchPlayer(body) {
+  try {
+    const response = await axiosInstance.post(endpoints.player, body, {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+      },
+    });
+
+    if (response.data.playabilityStatus.status === "OK") {
+      return response.data;
+    } else {
+      const safeBody = {
+        ...body,
+        context: {
+          ...body.context,
+          thirdParty: {
+            embedUrl: `https://www.youtube.com/watch?v=${body.videoId}`,
+          },
+        },
+      };
+
+      const safeResponse = await axiosInstance.post(endpoints.player, safeBody);
+
+      if (safeResponse.data.playabilityStatus.status !== "OK") {
+        return response.data;
+      }
+
+      const audioStreamsResponse = await axios.get(
+        `https://watchapi.whatever.social/streams/${body.videoId}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const audioStreams = audioStreamsResponse.data.audioStreams;
+
+      const updatedFormats =
+        safeResponse.data.streamingData.adaptiveFormats.map((format) => {
+          const matchedStream = audioStreams.find(
+            (stream) => stream.bitrate === format.bitrate
+          );
+          return {
+            ...format,
+            url: matchedStream ? matchedStream.url : format.url,
+          };
+        });
+
+      return {
+        ...safeResponse.data,
+        streamingData: {
+          ...safeResponse.data.streamingData,
+          adaptiveFormats: updatedFormats,
+        },
+      };
+    }
+  } catch (error) {
+    console.error("Error fetching player data:", error);
+    throw error;
+  }
 }

@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import axios from "axios";
 import bodyParser from "body-parser";
 import { Innertube } from "youtubei.js";
+import { fetchPlayer } from "./player.js";
 
 const app = express();
 const port = 5000;
@@ -17,7 +17,7 @@ app.get("/", (req, res) => {
   res.send("Finally you here!");
 });
 
-app.post("/stream", async (req, res) => {
+app.post("/innertune/stream", async (req, res) => {
   try {
     const videoId = req.query.videoId;
 
@@ -27,7 +27,12 @@ app.post("/stream", async (req, res) => {
         .json({ error: "videoId query parameter is required" });
     }
 
-    const yt = await Innertube.create();
+    const yt = await Innertube.create({
+      location: "ID",
+      cookie: "VISITOR_PRIVACY_METADATA:CgJJRBIEGgAgGg%3D%3D;",
+      retrieve_player: true,
+      visitor_data: "CgJJRBIEGgAgGg%3D%3D;",
+    });
     const info = await yt.getBasicInfo(videoId);
 
     if (!info) {
@@ -51,7 +56,7 @@ app.post("/stream", async (req, res) => {
   }
 });
 
-app.post("/watch", async (req, res) => {
+app.post("/android/stream", async (req, res) => {
   const videoId = req.query.videoId;
 
   if (!videoId) {
@@ -110,88 +115,7 @@ app.post("/watch", async (req, res) => {
   res.send(result?.url);
 });
 
-const baseURL = "https://music.youtube.com";
-const apiKey = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
-
-const axiosInstance = axios.create({
-  baseURL: baseURL,
-  headers: {
-    "Content-Type": "application/json",
-    "X-Goog-Api-Key": apiKey,
-  },
-  params: {
-    prettyPrint: "false",
-  },
-});
-
-const endpoints = {
-  player: "/youtubei/v1/player",
-};
-
-async function fetchPlayer(body) {
-  try {
-    const response = await axiosInstance.post(endpoints.player, body, {
-      headers: {
-        "X-Goog-Api-Key": apiKey,
-      },
-    });
-
-    if (response.data.playabilityStatus.status === "OK") {
-      return response.data;
-    } else {
-      const safeBody = {
-        ...body,
-        context: {
-          ...body.context,
-          thirdParty: {
-            embedUrl: `https://www.youtube.com/watch?v=${body.videoId}`,
-          },
-        },
-      };
-
-      const safeResponse = await axiosInstance.post(endpoints.player, safeBody);
-
-      if (safeResponse.data.playabilityStatus.status !== "OK") {
-        return response.data;
-      }
-
-      const audioStreamsResponse = await axios.get(
-        `https://watchapi.whatever.social/streams/${body.videoId}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const audioStreams = audioStreamsResponse.data.audioStreams;
-
-      const updatedFormats =
-        safeResponse.data.streamingData.adaptiveFormats.map((format) => {
-          const matchedStream = audioStreams.find(
-            (stream) => stream.bitrate === format.bitrate
-          );
-          return {
-            ...format,
-            url: matchedStream ? matchedStream.url : format.url,
-          };
-        });
-
-      return {
-        ...safeResponse.data,
-        streamingData: {
-          ...safeResponse.data.streamingData,
-          adaptiveFormats: updatedFormats,
-        },
-      };
-    }
-  } catch (error) {
-    console.error("Error fetching player data:", error);
-    throw error;
-  }
-}
-
-app.post("/proxy/player", async (req, res) => {
+app.post("/proxy/stream", async (req, res) => {
   try {
     const playerData = await fetchPlayer(req.body);
     res.json(playerData);
